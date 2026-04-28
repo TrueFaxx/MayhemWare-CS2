@@ -17,6 +17,20 @@ public class ConfigManager
     public Keys TriggerBotKey { get; set; }
     public bool TeamCheck { get; set; }
 
+    // ESP style settings
+    public int BoxStyle { get; set; }
+    public int BoxThickness { get; set; }
+    public int BoxColorIndex { get; set; }
+    public int EspCornerRadius { get; set; }
+
+    // Chams
+    public bool GlowChams { get; set; }
+    public int GlowColorIndex { get; set; }
+    public float GlowIntensity { get; set; }
+
+    // World changer
+    public bool MotionBlur { get; set; }
+    public float MotionBlurAmount { get; set; }
 
     public static ConfigManager Load()
     {
@@ -24,38 +38,25 @@ public class ConfigManager
         {
             if (!File.Exists(ConfigFile))
             {
-                var defaultOptions = Default();
-                Save(defaultOptions);
-                return defaultOptions;
+                var def = Default();
+                Save(def);
+                return def;
             }
-
             var json = File.ReadAllText(ConfigFile);
-            var options = JsonSerializer.Deserialize<ConfigManager>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            var options = JsonSerializer.Deserialize<ConfigManager>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             return options ?? Default();
         }
-        catch (JsonException)
-        {
-            return Default();
-        }
+        catch { return Default(); }
     }
 
     public static void Save(ConfigManager options)
     {
         try
         {
-            var json = JsonSerializer.Serialize(options, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var json = JsonSerializer.Serialize(options, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(ConfigFile, json);
         }
-        catch (JsonException)
-        {
-            // Handle serialization errors
-        }
+        catch { }
     }
 
     public static ConfigManager Default()
@@ -68,9 +69,18 @@ public class ConfigManager
             EspBox = true,
             SkeletonEsp = false,
             TriggerBot = true,
-            AimBotKey = Keys.LButton, // https://github.com/lolp1/Process.NET/blob/ce9ac9cceb2afb30c9288495615c6f3aa34bc1f8/src/Process.NET/Native/Types/NativeEnums.cs#L235
+            AimBotKey = Keys.LButton,
             TriggerBotKey = Keys.LMenu,
-            TeamCheck = true
+            TeamCheck = true,
+            BoxStyle = 0,
+            BoxThickness = 1,
+            BoxColorIndex = 0,
+            EspCornerRadius = 5,
+            GlowChams = false,
+            GlowColorIndex = 0,
+            GlowIntensity = 0.8f,
+            MotionBlur = false,
+            MotionBlurAmount = 0.5f
         };
     }
 }

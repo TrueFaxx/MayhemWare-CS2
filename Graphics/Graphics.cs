@@ -22,9 +22,7 @@ public class Graphics : ThreadedServiceBase
     };
 
     private readonly object _deviceLock = new();
-
     private readonly List<Vertex> _vertices = [];
-
     private Vector2 _currentResolution;
     private Device? _device;
     private bool _isDisposed;
@@ -41,7 +39,7 @@ public class Graphics : ThreadedServiceBase
 
     protected override string ThreadName => nameof(Graphics);
 
-    private WindowOverlay WindowOverlay { get; }
+    public WindowOverlay WindowOverlay { get; }
     public GameProcess GameProcess { get; }
     public GameData GameData { get; }
     public Font? FontAzonix64 { get; private set; }
@@ -51,9 +49,7 @@ public class Graphics : ThreadedServiceBase
     public override void Dispose()
     {
         if (_isDisposed) return;
-
         base.Dispose();
-
         lock (_deviceLock)
         {
             DisposeResources();
@@ -66,7 +62,6 @@ public class Graphics : ThreadedServiceBase
         var parameters = CreatePresentParameters();
         _device = new Device(new Direct3D(), 0, DeviceType.Hardware, WindowOverlay.Window.Handle,
             CreateFlags.HardwareVertexProcessing, parameters);
-
         InitializeFonts();
     }
 
@@ -116,6 +111,13 @@ public class Graphics : ThreadedServiceBase
     {
         if (!GameProcess.IsValid) return;
 
+        // Toggle menu with Delete or Right Shift
+        if (User32.GetAsyncKeyState((int)Keys.Delete) != 0 || User32.GetAsyncKeyState((int)Keys.RShiftKey) != 0)
+        {
+            Menu.Toggle();
+            Thread.Sleep(200);
+        }
+
         var newResolution = new Vector2(WindowOverlay.Window.Width, WindowOverlay.Window.Height);
         if (!_currentResolution.Equals(newResolution))
         {
@@ -141,13 +143,10 @@ public class Graphics : ThreadedServiceBase
         lock (_deviceLock)
         {
             if (_device == null) return;
-
             ConfigureRenderState();
             _device.Clear(ClearFlags.Target | ClearFlags.ZBuffer, Color.FromAbgr(0), 1, 0);
             _device.BeginScene();
-
             RenderScene();
-
             _device.EndScene();
             _device.Present();
         }
@@ -156,7 +155,6 @@ public class Graphics : ThreadedServiceBase
     private void ConfigureRenderState()
     {
         if (_device == null) return;
-
         _device.SetRenderState(RenderState.AlphaBlendEnable, true);
         _device.SetRenderState(RenderState.AlphaTestEnable, false);
         _device.SetRenderState(RenderState.SourceBlend, Blend.SourceAlpha);
@@ -172,6 +170,10 @@ public class Graphics : ThreadedServiceBase
         _vertices.Clear();
         DrawFeatures();
         RenderVertices();
+
+        // Draw menu on top
+        Menu.UpdateInput();
+        Menu.Draw(this);
     }
 
     private void DrawFeatures()
@@ -187,7 +189,6 @@ public class Graphics : ThreadedServiceBase
     private void RenderVertices()
     {
         if (_vertices.Count == 0) return;
-
         if (_device == null) return;
 
         using var vertices = new VertexBuffer(_device, _vertices.Count * 20, Usage.WriteOnly, VertexFormat.None,
@@ -209,10 +210,11 @@ public class Graphics : ThreadedServiceBase
         _device?.Dispose();
     }
 
+    // ================== NEW DRAWING METHODS ==================
+
     public void DrawLine(Color color, params Vector2[] verts)
     {
         if (verts.Length < 2 || verts.Length % 2 != 0) return;
-
         foreach (var vertex in verts)
             _vertices.Add(new Vertex
             {
@@ -224,13 +226,11 @@ public class Graphics : ThreadedServiceBase
     public void DrawLineWorld(Color color, params Vector3[] verticesWorld)
     {
         if (GameData.Player == null) return;
-
         var screenVertices = verticesWorld
             .Select(v => GameData.Player.MatrixViewProjectionViewport.Transform(v))
             .Where(v => v.Z < 1)
             .Select(v => new Vector2(v.X, v.Y))
             .ToArray();
-
         DrawLine(color, screenVertices);
     }
 
@@ -244,7 +244,79 @@ public class Graphics : ThreadedServiceBase
             new Vector2(topLeft.X, bottomRight.Y),
             topLeft
         };
+        for (var i = 0; i < vertices.Length - 1; i++)
+            DrawLine(color, vertices[i], vertices[i + 1]);
+    }
 
-        for (var i = 0; i < vertices.Length - 1; i++) DrawLine(color, vertices[i], vertices[i + 1]);
+    public void DrawFilledRectangle(Color color, RectangleF rect)
+    {
+        for (int y = (int)rect.Y; y < (int)(rect.Y + rect.Height); y++)
+            DrawLine(color, new Vector2(rect.X, y), new Vector2(rect.X + rect.Width, y));
+    }
+
+    public void DrawRoundedRectangle(Color color, Vector2 topLeft, Vector2 bottomRight, int radius)
+    {
+        if (radius <= 0)
+        {
+            DrawRectangle(color, topLeft, bottomRight);
+            return;
+        }
+
+        float x1 = topLeft.X, y1 = topLeft.Y;
+        float x2 = bottomRight.X, y2 = bottomRight.Y;
+        float r = Math.Min(radius, Math.Min((x2 - x1) / 2, (y2 - y1) / 2));
+
+        DrawLine(color, new Vector2(x1 + r, y1), new Vector2(x2 - r, y1));
+        DrawLine(color, new Vector2(x1 + r, y2), new Vector2(x2 - r, y2));
+        DrawLine(color, new Vector2(x1, y1 + r), new Vector2(x1, y2 - r));
+        DrawLine(color, new Vector2(x2, y1 + r), new Vector2(x2, y2 - r));
+
+        int seg = Math.Max(4, (int)(r / 2));
+        float step = (float)(Math.PI / 2 / seg);
+
+        // Top-Left corner
+        for (int i = 0; i < seg; i++)
+        {
+            float ang = (float)(Math.PI + step * i);
+            float xa = x1 + r - r * (float)Math.Cos(ang);
+            float ya = y1 + r - r * (float)Math.Sin(ang);
+            ang += step;
+            float xb = x1 + r - r * (float)Math.Cos(ang);
+            float yb = y1 + r - r * (float)Math.Sin(ang);
+            DrawLine(color, new Vector2(xa, ya), new Vector2(xb, yb));
+        }
+        // Top-Right corner
+        for (int i = 0; i < seg; i++)
+        {
+            float ang = (float)(-Math.PI / 2 + step * i);
+            float xa = x2 - r + r * (float)Math.Cos(ang);
+            float ya = y1 + r - r * (float)Math.Sin(ang);
+            ang += step;
+            float xb = x2 - r + r * (float)Math.Cos(ang);
+            float yb = y1 + r - r * (float)Math.Sin(ang);
+            DrawLine(color, new Vector2(xa, ya), new Vector2(xb, yb));
+        }
+        // Bottom-Right corner
+        for (int i = 0; i < seg; i++)
+        {
+            float ang = (float)(0 + step * i);
+            float xa = x2 - r + r * (float)Math.Cos(ang);
+            float ya = y2 - r + r * (float)Math.Sin(ang);
+            ang += step;
+            float xb = x2 - r + r * (float)Math.Cos(ang);
+            float yb = y2 - r + r * (float)Math.Sin(ang);
+            DrawLine(color, new Vector2(xa, ya), new Vector2(xb, yb));
+        }
+        // Bottom-Left corner
+        for (int i = 0; i < seg; i++)
+        {
+            float ang = (float)(Math.PI / 2 + step * i);
+            float xa = x1 + r - r * (float)Math.Cos(ang);
+            float ya = y2 - r + r * (float)Math.Sin(ang);
+            ang += step;
+            float xb = x1 + r - r * (float)Math.Cos(ang);
+            float yb = y2 - r + r * (float)Math.Sin(ang);
+            DrawLine(color, new Vector2(xa, ya), new Vector2(xb, yb));
+        }
     }
 }

@@ -12,6 +12,10 @@ public abstract class Offsets
 
     public const float WeaponRecoilScale = 2f;
     public static int dwLocalPlayerPawn;
+    public static IntPtr pMotionBlur;                         // address of mat_motion_blur_enabled convar value
+    public static int m_pGlowProperty;                        // offset inside C_BaseEntity
+    public static int m_bGlowEnabled;                         // offset inside CGlowProperty
+    public static int m_glowColorOverride;                    // offset inside CGlowProperty
     public static int m_vOldOrigin;
     public static int m_vecViewOffset;
     public static int m_AimPunchAngle;

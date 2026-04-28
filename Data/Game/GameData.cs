@@ -1,5 +1,7 @@
 ﻿using CS2Cheat.Data.Entity;
 using CS2Cheat.Utils;
+using CS2Cheat.Features;
+using System.Linq;
 
 namespace CS2Cheat.Data.Game;
 
@@ -40,10 +42,12 @@ public class GameData : ThreadedServiceBase
     {
         if (GameProcess == null || !GameProcess.IsValid) return;
         if (Player != null) Player.Update(GameProcess);
-
         if (Entities != null)
             foreach (var entity in Entities)
                 entity.Update(GameProcess);
+
+        Chams.Apply(GameProcess, Entities.Where(e => e.IsAlive()), Player);
+        WorldChanger.Update(GameProcess);
     }
 
     #endregion
