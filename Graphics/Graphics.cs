@@ -9,6 +9,8 @@ using static System.Windows.Application;
 using Color = SharpDX.Color;
 using Font = SharpDX.Direct3D9.Font;
 using FontWeight = SharpDX.Direct3D9.FontWeight;
+using RectangleF = System.Drawing.RectangleF;
+using static CS2Cheat.Core.User32;   // <-- THIS FIXES THE User32 error
 
 namespace CS2Cheat.Graphics;
 
@@ -112,7 +114,7 @@ public class Graphics : ThreadedServiceBase
         if (!GameProcess.IsValid) return;
 
         // Toggle menu with Delete or Right Shift
-        if (User32.GetAsyncKeyState((int)Keys.Delete) != 0 || User32.GetAsyncKeyState((int)Keys.RShiftKey) != 0)
+        if (GetAsyncKeyState((int)Keys.Delete) != 0 || GetAsyncKeyState((int)Keys.RShiftKey) != 0)
         {
             Menu.Toggle();
             Thread.Sleep(200);
@@ -210,7 +212,7 @@ public class Graphics : ThreadedServiceBase
         _device?.Dispose();
     }
 
-    // ================== NEW DRAWING METHODS ==================
+    // ========== DRAWING HELPERS ==========
 
     public void DrawLine(Color color, params Vector2[] verts)
     {
@@ -274,7 +276,7 @@ public class Graphics : ThreadedServiceBase
         int seg = Math.Max(4, (int)(r / 2));
         float step = (float)(Math.PI / 2 / seg);
 
-        // Top-Left corner
+        // Top-Left
         for (int i = 0; i < seg; i++)
         {
             float ang = (float)(Math.PI + step * i);
@@ -285,7 +287,7 @@ public class Graphics : ThreadedServiceBase
             float yb = y1 + r - r * (float)Math.Sin(ang);
             DrawLine(color, new Vector2(xa, ya), new Vector2(xb, yb));
         }
-        // Top-Right corner
+        // Top-Right
         for (int i = 0; i < seg; i++)
         {
             float ang = (float)(-Math.PI / 2 + step * i);
@@ -296,7 +298,7 @@ public class Graphics : ThreadedServiceBase
             float yb = y1 + r - r * (float)Math.Sin(ang);
             DrawLine(color, new Vector2(xa, ya), new Vector2(xb, yb));
         }
-        // Bottom-Right corner
+        // Bottom-Right
         for (int i = 0; i < seg; i++)
         {
             float ang = (float)(0 + step * i);
@@ -307,7 +309,7 @@ public class Graphics : ThreadedServiceBase
             float yb = y2 - r + r * (float)Math.Sin(ang);
             DrawLine(color, new Vector2(xa, ya), new Vector2(xb, yb));
         }
-        // Bottom-Left corner
+        // Bottom-Left
         for (int i = 0; i < seg; i++)
         {
             float ang = (float)(Math.PI / 2 + step * i);

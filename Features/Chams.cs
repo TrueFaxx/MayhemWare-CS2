@@ -10,17 +10,16 @@ namespace CS2Cheat.Features;
 public static class Chams
 {
     private static bool _enabled;
-    private static Color _color = Color.Red;
+    private static SharpDX.Color _color = SharpDX.Color.Red;
 
     public static bool Enabled => _enabled;
     public static void Toggle() => _enabled = !_enabled;
-    public static void SetColor(Color color) => _color = color;
+    public static void SetColor(SharpDX.Color color) => _color = color;
 
     public static void Apply(GameProcess gameProcess, IEnumerable<Entity> entities, Player localPlayer)
     {
         if (!_enabled || gameProcess?.Process == null) return;
 
-        var cfg = ConfigManager.Load();
         var glowColor = Menu.GetGlowColor();
         int rgba = (glowColor.R << 0) | (glowColor.G << 8) | (glowColor.B << 16) | (255 << 24);
 

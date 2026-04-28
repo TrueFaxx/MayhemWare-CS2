@@ -46,7 +46,9 @@ public class GameData : ThreadedServiceBase
             foreach (var entity in Entities)
                 entity.Update(GameProcess);
 
-        Chams.Apply(GameProcess, Entities.Where(e => e.IsAlive()), Player);
+        // Apply external features
+        if (Entities != null && Player != null)
+            Chams.Apply(GameProcess, Entities.Where(e => e.IsAlive()), Player);
         WorldChanger.Update(GameProcess);
     }
 

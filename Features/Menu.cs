@@ -4,6 +4,9 @@ using CS2Cheat.Graphics;
 using CS2Cheat.Utils;
 using SharpDX;
 using Keys = Process.NET.Native.Types.Keys;
+using RectangleF = System.Drawing.RectangleF;
+using Color = SharpDX.Color;
+using static CS2Cheat.Core.User32;   // <-- IMPORTANT
 
 namespace CS2Cheat.Features;
 
@@ -42,29 +45,29 @@ public static class Menu
     private static bool _triggerBot;
     private static bool _bombTimer;
 
-    private static readonly SharpDX.Color[] ColorPalette = 
+    private static readonly Color[] ColorPalette = 
     { 
-        SharpDX.Color.Red, SharpDX.Color.Green, SharpDX.Color.Blue, 
-        SharpDX.Color.Yellow, SharpDX.Color.Purple 
+        Color.Red, Color.Green, Color.Blue, 
+        Color.Yellow, Color.Purple 
     };
     private static readonly string[] ColorNames = { "Red", "Green", "Blue", "Yellow", "Purple" };
 
     public static bool IsVisible => _visible;
     public static void Toggle() => _visible = !_visible;
-    public static SharpDX.Color GetBoxColor() => ColorPalette[_boxColorIndex];
-    public static SharpDX.Color GetGlowColor() => ColorPalette[_glowColorIndex];
+    public static Color GetBoxColor() => ColorPalette[_boxColorIndex];
+    public static Color GetGlowColor() => ColorPalette[_glowColorIndex];
 
     public static void UpdateInput()
     {
         if (!_visible) return;
 
-        if (User32.GetAsyncKeyState((int)Keys.Up) != 0) { _selectedIndex = (_selectedIndex - 1 + Options.Length) % Options.Length; Task.Delay(150).Wait(); }
-        if (User32.GetAsyncKeyState((int)Keys.Down) != 0) { _selectedIndex = (_selectedIndex + 1) % Options.Length; Task.Delay(150).Wait(); }
+        if (GetAsyncKeyState((int)Keys.Up) != 0) { _selectedIndex = (_selectedIndex - 1 + Options.Length) % Options.Length; Task.Delay(150).Wait(); }
+        if (GetAsyncKeyState((int)Keys.Down) != 0) { _selectedIndex = (_selectedIndex + 1) % Options.Length; Task.Delay(150).Wait(); }
 
-        if (User32.GetAsyncKeyState((int)Keys.Left) != 0) { ChangeValue(-1); Task.Delay(150).Wait(); }
-        if (User32.GetAsyncKeyState((int)Keys.Right) != 0) { ChangeValue(1); Task.Delay(150).Wait(); }
+        if (GetAsyncKeyState((int)Keys.Left) != 0) { ChangeValue(-1); Task.Delay(150).Wait(); }
+        if (GetAsyncKeyState((int)Keys.Right) != 0) { ChangeValue(1); Task.Delay(150).Wait(); }
 
-        if (User32.GetAsyncKeyState((int)Keys.Enter) != 0)
+        if (GetAsyncKeyState((int)Keys.Enter) != 0)
         {
             if (_selectedIndex == 12) _visible = false;
             else if (_selectedIndex == 4) ToggleSkeleton();
@@ -132,12 +135,12 @@ public static class Menu
         var bgRect = new RectangleF(startX, startY, menuWidth, menuHeight);
         graphics.DrawFilledRectangle(new Color(0, 0, 0, 200), bgRect);
 
-        graphics.FontConsolas32?.DrawText(null, "[ ESP / World Settings ]", startX + 10, startY + 8, SharpDX.Color.White);
+        graphics.FontConsolas32?.DrawText(null, "[ ESP / World Settings ]", startX + 10, startY + 8, Color.White);
 
         for (int i = 0; i < Options.Length; i++)
         {
             int y = startY + 35 + i * 24;
-            var color = (i == _selectedIndex) ? SharpDX.Color.Yellow : SharpDX.Color.White;
+            var color = (i == _selectedIndex) ? Color.Yellow : Color.White;
             string display = Options[i];
             switch (i)
             {
@@ -156,6 +159,6 @@ public static class Menu
             }
             graphics.FontConsolas32?.DrawText(null, display, startX + 15, y, color);
         }
-        graphics.FontConsolas32?.DrawText(null, "Use ARROWS to change, ENTER to toggle", startX + 15, startY + menuHeight - 20, SharpDX.Color.Gray);
+        graphics.FontConsolas32?.DrawText(null, "Use ARROWS to change, ENTER to toggle", startX + 15, startY + menuHeight - 20, Color.Gray);
     }
 }
