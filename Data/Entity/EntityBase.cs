@@ -14,7 +14,7 @@ public abstract class EntityBase
     private bool LifeState { get; set; }
     public int Health { get; private set; }
     public Team Team { get; private set; }
-    protected Vector3 Origin { get; private set; }
+    public Vector3 Origin { get; protected set; }
     public int ShotsFired { get; private set; }
 
     private IntPtr CurrentWeapon { get; set; }

@@ -7,30 +7,32 @@ namespace CS2Cheat.Utils;
 public class ConfigManager
 {
     private const string ConfigFile = "config.json";
+
+    // Feature toggles
     public bool AimBot { get; set; }
     public bool BombTimer { get; set; }
     public bool EspAimCrosshair { get; set; }
     public bool EspBox { get; set; }
     public bool SkeletonEsp { get; set; }
     public bool TriggerBot { get; set; }
-    public Keys AimBotKey { get; set; }
-    public Keys TriggerBotKey { get; set; }
     public bool TeamCheck { get; set; }
-
-    // ESP style settings
-    public int BoxStyle { get; set; }
-    public int BoxThickness { get; set; }
-    public int BoxColorIndex { get; set; }
-    public int EspCornerRadius { get; set; }
-
-    // Chams
     public bool GlowChams { get; set; }
-    public int GlowColorIndex { get; set; }
-    public float GlowIntensity { get; set; }
+    public bool MotionBlur { get; set; }
+    public bool GrenadePrediction { get; set; }
+
+    // ESP styling
+    public int BoxStyle { get; set; }          // 0 = full, 1 = corner
+    public int BoxThickness { get; set; }      // 1-5
+    public int EspCornerRadius { get; set; }   // 0-20
+    public int BoxColorIndex { get; set; }     // 0-4 (Red, Green, Blue, Yellow, Purple)
+    public int GlowColorIndex { get; set; }    // 0-4
 
     // World changer
-    public bool MotionBlur { get; set; }
     public float MotionBlurAmount { get; set; }
+
+    // Hotkeys
+    public Keys AimBotKey { get; set; }
+    public Keys TriggerBotKey { get; set; }
 
     public static ConfigManager Load()
     {
@@ -69,18 +71,18 @@ public class ConfigManager
             EspBox = true,
             SkeletonEsp = false,
             TriggerBot = true,
-            AimBotKey = Keys.LButton,
-            TriggerBotKey = Keys.LMenu,
             TeamCheck = true,
+            GlowChams = false,
+            MotionBlur = false,
+            GrenadePrediction = false,
             BoxStyle = 0,
             BoxThickness = 1,
-            BoxColorIndex = 0,
             EspCornerRadius = 5,
-            GlowChams = false,
+            BoxColorIndex = 0,
             GlowColorIndex = 0,
-            GlowIntensity = 0.8f,
-            MotionBlur = false,
-            MotionBlurAmount = 0.5f
+            MotionBlurAmount = 0.5f,
+            AimBotKey = Keys.LButton,
+            TriggerBotKey = Keys.LMenu
         };
     }
 }

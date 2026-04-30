@@ -4,9 +4,8 @@ using CS2Cheat.Graphics;
 using CS2Cheat.Utils;
 using SharpDX;
 using Keys = Process.NET.Native.Types.Keys;
-using RectangleF = System.Drawing.RectangleF;
 using Color = SharpDX.Color;
-using static CS2Cheat.Core.User32;   // <-- IMPORTANT
+using static CS2Cheat.Core.User32;
 
 namespace CS2Cheat.Features;
 
@@ -14,151 +13,216 @@ public static class Menu
 {
     private static bool _visible = false;
     private static int _selectedIndex = 0;
+
+    // Options: toggles + settings
     private static readonly string[] Options = 
     {
-        "ESP Box Style",      // 0
-        "ESP Box Thickness",  // 1
-        "ESP Box Color",      // 2
-        "ESP Corner Radius",  // 3
-        "Skeleton ESP",       // 4
-        "Team Check",         // 5
-        "Glow Chams",         // 6
-        "Motion Blur",        // 7
-        "Motion Blur Amount", // 8
-        "AimBot",             // 9
-        "TriggerBot",         // 10
-        "Bomb Timer",         // 11
-        "Exit Menu"           // 12
+        "ESP Box",
+        "Skeleton ESP",
+        "Team Check",
+        "Glow Chams",
+        "Motion Blur",
+        "AimBot",
+        "TriggerBot",
+        "Bomb Timer",
+        "Grenade Predictor",   // new
+        "ESP Box Style",       // 0=full, 1=corner
+        "ESP Box Thickness",   // 1-5
+        "ESP Corner Radius",   // 0-20
+        "Exit Menu"
     };
 
-    private static int _boxStyle;
-    private static int _boxThickness;
-    private static int _boxColorIndex;
-    private static int _cornerRadius;
+    // Internal state
+    private static bool _espBox;
     private static bool _skeleton;
     private static bool _teamCheck;
     private static bool _glowChams;
-    private static int _glowColorIndex;
     private static bool _motionBlur;
-    private static float _motionBlurAmount;
     private static bool _aimBot;
     private static bool _triggerBot;
     private static bool _bombTimer;
+    private static bool _grenadePrediction;
 
-    private static readonly Color[] ColorPalette = 
-    { 
-        Color.Red, Color.Green, Color.Blue, 
-        Color.Yellow, Color.Purple 
-    };
-    private static readonly string[] ColorNames = { "Red", "Green", "Blue", "Yellow", "Purple" };
+    private static int _boxStyle;
+    private static int _boxThickness;
+    private static int _cornerRadius;
 
     public static bool IsVisible => _visible;
     public static void Toggle() => _visible = !_visible;
-    public static Color GetBoxColor() => ColorPalette[_boxColorIndex];
-    public static Color GetGlowColor() => ColorPalette[_glowColorIndex];
+
+    // For ESP features – reads config every time (cached in menu)
+    public static Color GetBoxColor()
+    {
+        var cfg = ConfigManager.Load();
+        return cfg.BoxColorIndex switch
+        {
+            0 => Color.Red,
+            1 => Color.Green,
+            2 => Color.Blue,
+            3 => Color.Yellow,
+            4 => Color.Purple,
+            _ => Color.White
+        };
+    }
+
+    public static Color GetGlowColor()
+    {
+        var cfg = ConfigManager.Load();
+        return cfg.GlowColorIndex switch
+        {
+            0 => Color.Red,
+            1 => Color.Green,
+            2 => Color.Blue,
+            3 => Color.Yellow,
+            4 => Color.Purple,
+            _ => Color.White
+        };
+    }
+
+    public static int GetBoxStyle() => _boxStyle;
+    public static int GetBoxThickness() => _boxThickness;
+    public static int GetCornerRadius() => _cornerRadius;
 
     public static void UpdateInput()
     {
         if (!_visible) return;
 
-        if (GetAsyncKeyState((int)Keys.Up) != 0) { _selectedIndex = (_selectedIndex - 1 + Options.Length) % Options.Length; Task.Delay(150).Wait(); }
-        if (GetAsyncKeyState((int)Keys.Down) != 0) { _selectedIndex = (_selectedIndex + 1) % Options.Length; Task.Delay(150).Wait(); }
+        // Navigation
+        if (GetAsyncKeyState((int)Keys.Up) != 0)
+        {
+            _selectedIndex = (_selectedIndex - 1 + Options.Length) % Options.Length;
+            Task.Delay(120).Wait();
+        }
+        if (GetAsyncKeyState((int)Keys.Down) != 0)
+        {
+            _selectedIndex = (_selectedIndex + 1) % Options.Length;
+            Task.Delay(120).Wait();
+        }
 
-        if (GetAsyncKeyState((int)Keys.Left) != 0) { ChangeValue(-1); Task.Delay(150).Wait(); }
-        if (GetAsyncKeyState((int)Keys.Right) != 0) { ChangeValue(1); Task.Delay(150).Wait(); }
+        // Adjust values with left/right
+        if (GetAsyncKeyState((int)Keys.Left) != 0)
+        {
+            AdjustOption(-1);
+            Task.Delay(120).Wait();
+        }
+        if (GetAsyncKeyState((int)Keys.Right) != 0)
+        {
+            AdjustOption(1);
+            Task.Delay(120).Wait();
+        }
 
+        // Enter toggles boolean options
         if (GetAsyncKeyState((int)Keys.Enter) != 0)
         {
-            if (_selectedIndex == 12) _visible = false;
-            else if (_selectedIndex == 4) ToggleSkeleton();
-            else if (_selectedIndex == 5) ToggleTeamCheck();
-            else if (_selectedIndex == 6) ToggleGlowChams();
-            else if (_selectedIndex == 7) ToggleMotionBlur();
-            else if (_selectedIndex == 9) ToggleAimBot();
-            else if (_selectedIndex == 10) ToggleTriggerBot();
-            else if (_selectedIndex == 11) ToggleBombTimer();
+            if (_selectedIndex == Options.Length - 1) // Exit
+                _visible = false;
+            else if (_selectedIndex < 8) // boolean toggles (0-7 + grenade predictor at index 8)
+                ToggleBoolean(_selectedIndex);
             Task.Delay(200).Wait();
         }
 
-        LoadFromConfig();
-    }
-
-    private static void ChangeValue(int delta)
-    {
+        // Load latest config states
         var cfg = ConfigManager.Load();
-        switch (_selectedIndex)
-        {
-            case 0: _boxStyle = (_boxStyle + delta + 2) % 2; cfg.BoxStyle = _boxStyle; break;
-            case 1: _boxThickness = Math.Clamp(_boxThickness + delta, 1, 5); cfg.BoxThickness = _boxThickness; break;
-            case 2: _boxColorIndex = (_boxColorIndex + delta + ColorPalette.Length) % ColorPalette.Length; cfg.BoxColorIndex = _boxColorIndex; break;
-            case 3: _cornerRadius = Math.Clamp(_cornerRadius + delta * 2, 0, 20); cfg.EspCornerRadius = _cornerRadius; break;
-            case 8: _motionBlurAmount = Math.Clamp(_motionBlurAmount + delta * 0.05f, 0f, 1f); cfg.MotionBlurAmount = _motionBlurAmount; break;
-            default: return;
-        }
-        ConfigManager.Save(cfg);
-    }
-
-    private static void ToggleSkeleton() { var cfg = ConfigManager.Load(); cfg.SkeletonEsp = !cfg.SkeletonEsp; ConfigManager.Save(cfg); _skeleton = cfg.SkeletonEsp; }
-    private static void ToggleTeamCheck() { var cfg = ConfigManager.Load(); cfg.TeamCheck = !cfg.TeamCheck; ConfigManager.Save(cfg); _teamCheck = cfg.TeamCheck; }
-    private static void ToggleGlowChams() { var cfg = ConfigManager.Load(); cfg.GlowChams = !cfg.GlowChams; ConfigManager.Save(cfg); _glowChams = cfg.GlowChams; }
-    private static void ToggleMotionBlur() { var cfg = ConfigManager.Load(); cfg.MotionBlur = !cfg.MotionBlur; ConfigManager.Save(cfg); _motionBlur = cfg.MotionBlur; }
-    private static void ToggleAimBot() { var cfg = ConfigManager.Load(); cfg.AimBot = !cfg.AimBot; ConfigManager.Save(cfg); _aimBot = cfg.AimBot; }
-    private static void ToggleTriggerBot() { var cfg = ConfigManager.Load(); cfg.TriggerBot = !cfg.TriggerBot; ConfigManager.Save(cfg); _triggerBot = cfg.TriggerBot; }
-    private static void ToggleBombTimer() { var cfg = ConfigManager.Load(); cfg.BombTimer = !cfg.BombTimer; ConfigManager.Save(cfg); _bombTimer = cfg.BombTimer; }
-
-    private static void LoadFromConfig()
-    {
-        var cfg = ConfigManager.Load();
-        _boxStyle = cfg.BoxStyle;
-        _boxThickness = cfg.BoxThickness;
-        _boxColorIndex = cfg.BoxColorIndex;
-        _cornerRadius = cfg.EspCornerRadius;
+        _espBox = cfg.EspBox;
         _skeleton = cfg.SkeletonEsp;
         _teamCheck = cfg.TeamCheck;
         _glowChams = cfg.GlowChams;
-        _glowColorIndex = cfg.GlowColorIndex;
         _motionBlur = cfg.MotionBlur;
-        _motionBlurAmount = cfg.MotionBlurAmount;
         _aimBot = cfg.AimBot;
         _triggerBot = cfg.TriggerBot;
         _bombTimer = cfg.BombTimer;
+        _grenadePrediction = cfg.GrenadePrediction;
+        _boxStyle = cfg.BoxStyle;
+        _boxThickness = cfg.BoxThickness;
+        _cornerRadius = cfg.EspCornerRadius;
+    }
+
+    private static void AdjustOption(int delta)
+    {
+        switch (_selectedIndex)
+        {
+            case 9:  // Box Style
+                _boxStyle = (_boxStyle + delta + 2) % 2;
+                var cfg1 = ConfigManager.Load();
+                cfg1.BoxStyle = _boxStyle;
+                ConfigManager.Save(cfg1);
+                break;
+            case 10: // Box Thickness
+                _boxThickness = Math.Clamp(_boxThickness + delta, 1, 5);
+                var cfg2 = ConfigManager.Load();
+                cfg2.BoxThickness = _boxThickness;
+                ConfigManager.Save(cfg2);
+                break;
+            case 11: // Corner Radius
+                _cornerRadius = Math.Clamp(_cornerRadius + delta * 2, 0, 20);
+                var cfg3 = ConfigManager.Load();
+                cfg3.EspCornerRadius = _cornerRadius;
+                ConfigManager.Save(cfg3);
+                break;
+        }
+    }
+
+    private static void ToggleBoolean(int idx)
+    {
+        var cfg = ConfigManager.Load();
+        switch (idx)
+        {
+            case 0: cfg.EspBox = !cfg.EspBox; break;
+            case 1: cfg.SkeletonEsp = !cfg.SkeletonEsp; break;
+            case 2: cfg.TeamCheck = !cfg.TeamCheck; break;
+            case 3: cfg.GlowChams = !cfg.GlowChams; break;
+            case 4: cfg.MotionBlur = !cfg.MotionBlur; break;
+            case 5: cfg.AimBot = !cfg.AimBot; break;
+            case 6: cfg.TriggerBot = !cfg.TriggerBot; break;
+            case 7: cfg.BombTimer = !cfg.BombTimer; break;
+            case 8: cfg.GrenadePrediction = !cfg.GrenadePrediction; break;
+        }
+        ConfigManager.Save(cfg);
     }
 
     public static void Draw(Graphics.Graphics graphics)
     {
         if (!_visible) return;
-
-        var screenSize = graphics.GameProcess.WindowRectangleClient.Size;
-        int menuWidth = 350, menuHeight = Options.Length * 26 + 40;
-        int startX = (screenSize.Width - menuWidth) / 2;
-        int startY = (screenSize.Height - menuHeight) / 2;
-        var bgRect = new RectangleF(startX, startY, menuWidth, menuHeight);
-        graphics.DrawFilledRectangle(new Color(0, 0, 0, 200), bgRect);
-
-        graphics.FontConsolas32?.DrawText(null, "[ ESP / World Settings ]", startX + 10, startY + 8, Color.White);
-
-        for (int i = 0; i < Options.Length; i++)
+        try
         {
-            int y = startY + 35 + i * 24;
-            var color = (i == _selectedIndex) ? Color.Yellow : Color.White;
-            string display = Options[i];
-            switch (i)
+            if (graphics?.GameProcess == null || !graphics.GameProcess.IsValid) return;
+            var font = graphics.FontConsolas32;
+            if (font == null) return;
+
+            var screenSize = graphics.GameProcess.WindowRectangleClient.Size;
+            if (screenSize.Width <= 0 || screenSize.Height <= 0) return;
+
+            int menuX = 20, menuY = 20, lineHeight = 20, width = 260;
+
+            // Background
+            for (int y = menuY - 5; y < menuY + Options.Length * lineHeight + 10; y++)
+                graphics.DrawLine(new Color(0, 0, 0, 180), new Vector2(menuX - 5, y), new Vector2(menuX + width, y));
+
+            for (int i = 0; i < Options.Length; i++)
             {
-                case 0: display += $": {(_boxStyle == 0 ? "Full Box" : "Corner Only")}"; break;
-                case 1: display += $": {_boxThickness}px"; break;
-                case 2: display += $": {ColorNames[_boxColorIndex]}"; break;
-                case 3: display += $": {_cornerRadius}px"; break;
-                case 4: display += $": {(_skeleton ? "ON" : "OFF")}"; break;
-                case 5: display += $": {(_teamCheck ? "ON" : "OFF")}"; break;
-                case 6: display += $": {(_glowChams ? "ON" : "OFF")}"; break;
-                case 7: display += $": {(_motionBlur ? "ON" : "OFF")}"; break;
-                case 8: display += $": {_motionBlurAmount:F2}"; break;
-                case 9: display += $": {(_aimBot ? "ON" : "OFF")}"; break;
-                case 10: display += $": {(_triggerBot ? "ON" : "OFF")}"; break;
-                case 11: display += $": {(_bombTimer ? "ON" : "OFF")}"; break;
+                Color color = (i == _selectedIndex) ? Color.Yellow : Color.White;
+                string display = Options[i];
+                string value = "";
+
+                switch (i)
+                {
+                    case 0: value = _espBox ? "[ON]" : "[OFF]"; break;
+                    case 1: value = _skeleton ? "[ON]" : "[OFF]"; break;
+                    case 2: value = _teamCheck ? "[ON]" : "[OFF]"; break;
+                    case 3: value = _glowChams ? "[ON]" : "[OFF]"; break;
+                    case 4: value = _motionBlur ? "[ON]" : "[OFF]"; break;
+                    case 5: value = _aimBot ? "[ON]" : "[OFF]"; break;
+                    case 6: value = _triggerBot ? "[ON]" : "[OFF]"; break;
+                    case 7: value = _bombTimer ? "[ON]" : "[OFF]"; break;
+                    case 8: value = _grenadePrediction ? "[ON]" : "[OFF]"; break;
+                    case 9: value = _boxStyle == 0 ? "[Full]" : "[Corner]"; break;
+                    case 10: value = $"[{_boxThickness}]"; break;
+                    case 11: value = $"[{_cornerRadius}px]"; break;
+                }
+                font.DrawText(null, $"{display,-22} {value}", menuX, menuY + i * lineHeight, color);
             }
-            graphics.FontConsolas32?.DrawText(null, display, startX + 15, y, color);
+            font.DrawText(null, "↑ ↓ ← → | ENTER | DEL/RSHIFT", menuX, menuY + Options.Length * lineHeight + 5, Color.Gray);
         }
-        graphics.FontConsolas32?.DrawText(null, "Use ARROWS to change, ENTER to toggle", startX + 15, startY + menuHeight - 20, Color.Gray);
+        catch (Exception ex) { Console.WriteLine($"[Menu Draw] {ex.Message}"); }
     }
 }

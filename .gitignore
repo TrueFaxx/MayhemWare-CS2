@@ -1,5 +1,21 @@
-/obj
-/.vs/CS2Cheat/FileContentIndex
-/.vs/CS2Cheat/v17
-/bin/Debug/net8.0-windows
-/.vs/CS2Cheat/DesignTimeBuild
+# Build outputs
+bin/
+obj/
+output/
+*.exe
+*.dll
+*.pdb
+
+# User specific files
+*.user
+*.suo
+.vs/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Compiled executables from publish
+**/publish/*.exe
+**/publish/*.dll

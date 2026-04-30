@@ -1,20 +1,18 @@
-﻿using CS2Cheat.Core.Data;
+﻿using System;
+using System.Collections.Generic;
+using CS2Cheat.Core.Data;
 using CS2Cheat.Data.Entity;
 using CS2Cheat.Graphics;
 using CS2Cheat.Utils;
 using SharpDX;
-using SharpDX.Direct3D9;
-using Color = SharpDX.Color;
 using RectangleF = System.Drawing.RectangleF;
-using FontDrawFlags = SharpDX.Direct3D9.FontDrawFlags;
+using Color = SharpDX.Color;   // <-- resolves ambiguity
 
 namespace CS2Cheat.Features;
 
 public static class EspBox
 {
     private const int OutlineThickness = 2;
-    private static ConfigManager? _config;
-    private static ConfigManager Config => _config ??= ConfigManager.Load();
 
     private static readonly Dictionary<string, string> GunIcons = new()
     {
@@ -36,10 +34,13 @@ public static class EspBox
         var player = graphics.GameData.Player;
         if (player == null || graphics.GameData.Entities == null) return;
 
+        var cfg = ConfigManager.Load();
+        if (!cfg.EspBox) return;
+
         foreach (var entity in graphics.GameData.Entities)
         {
             if (!entity.IsAlive() || entity.AddressBase == player.AddressBase) continue;
-            if (Config.TeamCheck && entity.Team == player.Team) continue;
+            if (cfg.TeamCheck && entity.Team == player.Team) continue;
 
             var boundingBox = GetEntityBoundingBox(graphics, entity);
             if (boundingBox == null) continue;
@@ -51,29 +52,28 @@ public static class EspBox
     private static void DrawEntityInfo(Graphics.Graphics graphics, Entity entity, (Vector2, Vector2) boundingBox)
     {
         var (topLeft, bottomRight) = boundingBox;
-        if (topLeft.X > bottomRight.X || topLeft.Y > bottomRight.Y) return;
+        if (topLeft.X >= bottomRight.X || topLeft.Y >= bottomRight.Y) return;
 
-        var cfg = ConfigManager.Load();
-        int thickness = cfg.BoxThickness;
-        int radius = cfg.EspCornerRadius;
+        int thickness = Menu.GetBoxThickness();
+        int radius = Menu.GetCornerRadius();
         Color boxColor = Menu.GetBoxColor();
+        int boxStyle = Menu.GetBoxStyle();
 
         for (int i = 0; i < thickness; i++)
         {
             var tl = new Vector2(topLeft.X - i, topLeft.Y - i);
             var br = new Vector2(bottomRight.X + i, bottomRight.Y + i);
-            if (cfg.BoxStyle == 0)
+            if (boxStyle == 0)
                 graphics.DrawRoundedRectangle(boxColor, tl, br, radius);
             else
-                DrawCornerBox(graphics, boxColor, tl, br, radius);
+                DrawCornerBox(graphics, boxColor, tl, br);
         }
 
         // Health bar
         float healthPercent = Math.Clamp(entity.Health / 100f, 0f, 1f);
         var healthBarPos = new Vector2(topLeft.X - 10 - OutlineThickness, topLeft.Y);
-        var healthBarSize = new Vector2(6, (bottomRight.Y - topLeft.Y) * healthPercent);
         graphics.DrawFilledRectangle(Color.Black, new RectangleF(healthBarPos.X, healthBarPos.Y, 6, bottomRight.Y - topLeft.Y));
-        graphics.DrawFilledRectangle(Color.Green, new RectangleF(healthBarPos.X, healthBarPos.Y + (bottomRight.Y - topLeft.Y - healthBarSize.Y), 6, healthBarSize.Y));
+        graphics.DrawFilledRectangle(Color.Green, new RectangleF(healthBarPos.X, healthBarPos.Y + (bottomRight.Y - topLeft.Y) * (1 - healthPercent), 6, (bottomRight.Y - topLeft.Y) * healthPercent));
         graphics.DrawRectangle(Color.Black, healthBarPos, new Vector2(healthBarPos.X + 6, bottomRight.Y));
 
         // Health number
@@ -101,10 +101,8 @@ public static class EspBox
         }
 
         // Status flags
-        var flagX = (int)(bottomRight.X + 5);
-        var flagY = (int)topLeft.Y;
-        var spacing = 15;
-
+        int flagX = (int)(bottomRight.X + 5), flagY = (int)topLeft.Y;
+        int spacing = 15;
         if (entity.IsInScope == 1)
             graphics.FontConsolas32?.DrawText(null, "Scoped", flagX, flagY, Color.White);
         if (entity.FlashAlpha > 7)
@@ -115,9 +113,14 @@ public static class EspBox
             graphics.FontConsolas32?.DrawText(null, "Shifting in scope", flagX, flagY + spacing * 3, Color.White);
     }
 
-    private static void DrawCornerBox(Graphics.Graphics graphics, Color color, Vector2 tl, Vector2 br, int radius)
+    private static void DrawCornerBox(Graphics.Graphics graphics, Color color, Vector2 tl, Vector2 br)
     {
-        int len = 12;
+        float width = br.X - tl.X;
+        float height = br.Y - tl.Y;
+        float minDim = Math.Min(width, height);
+        int len = (int)Math.Clamp(minDim * 0.2f, 5f, 25f);
+        if (len < 2) len = 12;
+
         graphics.DrawLine(color, tl, new Vector2(tl.X + len, tl.Y));
         graphics.DrawLine(color, tl, new Vector2(tl.X, tl.Y + len));
         graphics.DrawLine(color, new Vector2(br.X, tl.Y), new Vector2(br.X - len, tl.Y));
@@ -130,35 +133,35 @@ public static class EspBox
 
     private static (Vector2, Vector2)? GetEntityBoundingBox(Graphics.Graphics graphics, Entity entity)
     {
-        const float padding = 5.0f;
-        if (graphics.GameData.Player == null) return null;
-        var matrix = graphics.GameData.Player.MatrixViewProjectionViewport;
-        if (entity.BonePos == null || entity.BonePos.Count == 0) return null;
+        const float padding = 5f;
+        var player = graphics.GameData.Player;
+        if (player == null) return null;
 
-        var min = new Vector2(float.MaxValue, float.MaxValue);
-        var max = new Vector2(float.MinValue, float.MinValue);
-        bool anyValid = false;
+        var matrix = player.MatrixViewProjectionViewport;
+        if (!entity.BonePos.TryGetValue("head", out var headPos)) return null;
 
-        foreach (var bone in entity.BonePos.Values)
-        {
-            var transformed = matrix.Transform(bone);
-            if (transformed.Z >= 1) continue;
-            anyValid = true;
-            min.X = Math.Min(min.X, transformed.X);
-            min.Y = Math.Min(min.Y, transformed.Y);
-            max.X = Math.Max(max.X, transformed.X);
-            max.Y = Math.Max(max.Y, transformed.Y);
-        }
+        var screenHead = matrix.Transform(headPos);
+        var screenFoot = matrix.Transform(entity.Origin);
+        if (screenHead.Z >= 1 || screenFoot.Z >= 1 || screenHead.Y > screenFoot.Y) return null;
 
-        if (!anyValid) return null;
+        float height = screenFoot.Y - screenHead.Y;
+        if (height <= 1f) return null;
 
-        var sizeMultiplier = 2f - entity.Health / 100f;
-        var paddingVec = new Vector2(padding * sizeMultiplier);
-        return (min - paddingVec, max + paddingVec);
+        float width = height * 0.5f;
+        var topLeft = new Vector2(screenHead.X - width / 2, screenHead.Y) - new Vector2(padding, padding);
+        var bottomRight = new Vector2(screenHead.X + width / 2, screenFoot.Y) + new Vector2(padding, padding);
+
+        var screenSize = graphics.GameProcess.WindowRectangleClient.Size;
+        topLeft.X = Math.Clamp(topLeft.X, 0, screenSize.Width);
+        topLeft.Y = Math.Clamp(topLeft.Y, 0, screenSize.Height);
+        bottomRight.X = Math.Clamp(bottomRight.X, 0, screenSize.Width);
+        bottomRight.Y = Math.Clamp(bottomRight.Y, 0, screenSize.Height);
+
+        return (topLeft.X < bottomRight.X && topLeft.Y < bottomRight.Y) ? (topLeft, bottomRight) : null;
     }
 
     private static string GetWeaponIcon(string weapon)
     {
-        return GunIcons.TryGetValue(weapon?.ToLower() ?? string.Empty, out var icon) ? icon : string.Empty;
+        return GunIcons.TryGetValue(weapon?.ToLower() ?? "", out var icon) ? icon : "";
     }
 }

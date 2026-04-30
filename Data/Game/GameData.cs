@@ -1,27 +1,18 @@
-﻿using CS2Cheat.Data.Entity;
+﻿using System.Linq;
+using CS2Cheat.Data.Entity;
 using CS2Cheat.Utils;
 using CS2Cheat.Features;
-using System.Linq;
 
 namespace CS2Cheat.Data.Game;
 
 public class GameData : ThreadedServiceBase
 {
-    #region properties
-
     protected override string ThreadName => nameof(GameData);
 
     private GameProcess? GameProcess { get; set; }
-
     public Player? Player { get; private set; }
-
     public Entity.Entity[]? Entities { get; private set; }
 
-    #endregion
-
-    #region methods
-
-    /// <inheritdoc />
     public GameData(GameProcess gameProcess)
     {
         GameProcess = gameProcess;
@@ -32,7 +23,6 @@ public class GameData : ThreadedServiceBase
     public override void Dispose()
     {
         base.Dispose();
-
         Entities = null;
         Player = null;
         GameProcess = null;
@@ -41,7 +31,7 @@ public class GameData : ThreadedServiceBase
     protected override void FrameAction()
     {
         if (GameProcess == null || !GameProcess.IsValid) return;
-        if (Player != null) Player.Update(GameProcess);
+        Player?.Update(GameProcess);
         if (Entities != null)
             foreach (var entity in Entities)
                 entity.Update(GameProcess);
@@ -51,6 +41,4 @@ public class GameData : ThreadedServiceBase
             Chams.Apply(GameProcess, Entities.Where(e => e.IsAlive()), Player);
         WorldChanger.Update(GameProcess);
     }
-
-    #endregion
 }

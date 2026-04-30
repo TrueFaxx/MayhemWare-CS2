@@ -10,7 +10,7 @@ using Color = SharpDX.Color;
 using Font = SharpDX.Direct3D9.Font;
 using FontWeight = SharpDX.Direct3D9.FontWeight;
 using RectangleF = System.Drawing.RectangleF;
-using static CS2Cheat.Core.User32;   // <-- THIS FIXES THE User32 error
+using static CS2Cheat.Core.User32;
 
 namespace CS2Cheat.Graphics;
 
@@ -92,8 +92,7 @@ public class Graphics : ThreadedServiceBase
         Undefeated = new Font(_device, CreateFontDescription("undefeated", 12, FontCharacterSet.Default));
     }
 
-    private static FontDescription CreateFontDescription(string faceName, int height,
-        FontCharacterSet characterSet = FontCharacterSet.Ansi)
+    private static FontDescription CreateFontDescription(string faceName, int height, FontCharacterSet characterSet = FontCharacterSet.Ansi)
     {
         return new FontDescription
         {
@@ -172,7 +171,6 @@ public class Graphics : ThreadedServiceBase
         _vertices.Clear();
         DrawFeatures();
         RenderVertices();
-
         // Draw menu on top
         Menu.UpdateInput();
         Menu.Draw(this);
@@ -186,6 +184,8 @@ public class Graphics : ThreadedServiceBase
         if (features.EspBox) EspBox.Draw(this);
         if (features.SkeletonEsp) SkeletonEsp.Draw(this);
         if (features.BombTimer) BombTimer.Draw(this);
+        if (features.GrenadePrediction) GrenadePredictor.Draw(this);  // add this line
+        
     }
 
     private void RenderVertices()
@@ -193,8 +193,7 @@ public class Graphics : ThreadedServiceBase
         if (_vertices.Count == 0) return;
         if (_device == null) return;
 
-        using var vertices = new VertexBuffer(_device, _vertices.Count * 20, Usage.WriteOnly, VertexFormat.None,
-            Pool.Managed);
+        using var vertices = new VertexBuffer(_device, _vertices.Count * 20, Usage.WriteOnly, VertexFormat.None, Pool.Managed);
         vertices.Lock(0, 0, LockFlags.None).WriteRange(_vertices.ToArray());
         vertices.Unlock();
 
@@ -212,60 +211,49 @@ public class Graphics : ThreadedServiceBase
         _device?.Dispose();
     }
 
-    // ========== DRAWING HELPERS ==========
-
+    // Drawing helpers
     public void DrawLine(Color color, params Vector2[] verts)
     {
         if (verts.Length < 2 || verts.Length % 2 != 0) return;
         foreach (var vertex in verts)
-            _vertices.Add(new Vertex
-            {
-                Color = color,
-                Position = new Vector4(vertex.X, vertex.Y, 0.5f, 1.0f)
-            });
+            _vertices.Add(new Vertex { Color = color, Position = new Vector4(vertex.X, vertex.Y, 0.5f, 1.0f) });
     }
 
     public void DrawLineWorld(Color color, params Vector3[] verticesWorld)
     {
         if (GameData.Player == null) return;
-        var screenVertices = verticesWorld
+        var screen = verticesWorld
             .Select(v => GameData.Player.MatrixViewProjectionViewport.Transform(v))
             .Where(v => v.Z < 1)
-            .Select(v => new Vector2(v.X, v.Y))
-            .ToArray();
-        DrawLine(color, screenVertices);
+            .Select(v => new Vector2(v.X, v.Y)).ToArray();
+        DrawLine(color, screen);
     }
 
+   public void DrawFilledRectangle(Color color, RectangleF rect)
+    {
+        if (_device == null) return;
+        var screen = GameProcess.WindowRectangleClient;
+        int x = (int)rect.X;
+        int yStart = Math.Max(0, (int)rect.Y);
+        int yEnd = Math.Min(screen.Height, (int)(rect.Y + rect.Height));
+        int width = (int)rect.Width;
+        if (width <= 0 || yStart >= yEnd) return;
+        for (int y = yStart; y < yEnd; y++)
+            DrawLine(color, new Vector2(x, y), new Vector2(x + width, y));
+    }
     public void DrawRectangle(Color color, Vector2 topLeft, Vector2 bottomRight)
     {
-        var vertices = new[]
-        {
-            topLeft,
-            new Vector2(bottomRight.X, topLeft.Y),
-            bottomRight,
-            new Vector2(topLeft.X, bottomRight.Y),
-            topLeft
-        };
-        for (var i = 0; i < vertices.Length - 1; i++)
-            DrawLine(color, vertices[i], vertices[i + 1]);
-    }
-
-    public void DrawFilledRectangle(Color color, RectangleF rect)
-    {
-        for (int y = (int)rect.Y; y < (int)(rect.Y + rect.Height); y++)
-            DrawLine(color, new Vector2(rect.X, y), new Vector2(rect.X + rect.Width, y));
+        DrawLine(color, topLeft, new Vector2(bottomRight.X, topLeft.Y));
+        DrawLine(color, new Vector2(bottomRight.X, topLeft.Y), bottomRight);
+        DrawLine(color, bottomRight, new Vector2(topLeft.X, bottomRight.Y));
+        DrawLine(color, new Vector2(topLeft.X, bottomRight.Y), topLeft);
     }
 
     public void DrawRoundedRectangle(Color color, Vector2 topLeft, Vector2 bottomRight, int radius)
     {
-        if (radius <= 0)
-        {
-            DrawRectangle(color, topLeft, bottomRight);
-            return;
-        }
+        if (radius <= 0) { DrawRectangle(color, topLeft, bottomRight); return; }
 
-        float x1 = topLeft.X, y1 = topLeft.Y;
-        float x2 = bottomRight.X, y2 = bottomRight.Y;
+        float x1 = topLeft.X, y1 = topLeft.Y, x2 = bottomRight.X, y2 = bottomRight.Y;
         float r = Math.Min(radius, Math.Min((x2 - x1) / 2, (y2 - y1) / 2));
 
         DrawLine(color, new Vector2(x1 + r, y1), new Vector2(x2 - r, y1));
